@@ -1,8 +1,8 @@
+require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
-const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const ytSearch = require('yt-search');
-require('dotenv').config();
 
 const client = new Client({
   intents: [
@@ -20,6 +20,7 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
+  // 🎵 Play command
   if (message.content.startsWith('!play')) {
     const query = message.content.replace('!play', '').trim();
     if (!query) return message.reply('Please type a song name or link!');
@@ -31,7 +32,7 @@ client.on('messageCreate', async (message) => {
     const video = result.videos.length ? result.videos[0] : null;
     if (!video) return message.reply('No results found.');
 
-    const stream = ytdl(video.url, { filter: 'audioonly' });
+    const stream = ytdl(video.url, { filter: 'audioonly', highWaterMark: 1 << 25 });
     const resource = createAudioResource(stream);
     const player = createAudioPlayer();
 
@@ -47,12 +48,16 @@ client.on('messageCreate', async (message) => {
     message.reply(`🎶 Now playing: **${video.title}**`);
   }
 
+  // 🛑 Stop command
   if (message.content === '!stop') {
-    const vc = message.member.voice.channel;
-    if (!vc) return message.reply('Join a voice channel first!');
-    vc.leave();
-    message.reply('🛑 Music stopped.');
+    const connection = getVoiceConnection(message.guild.id);
+    if (connection) {
+      connection.destroy();
+      message.reply('🛑 Music stopped.');
+    } else {
+      message.reply('Not playing anything right now.');
+    }
   }
 });
 
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
